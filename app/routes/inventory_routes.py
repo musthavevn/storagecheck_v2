@@ -117,7 +117,7 @@ def product_update():
     sell_price = float(request.form.get("sell_price", "0") or 0)
 
     if role == "staff":
-        # Staff with can_edit_prices may only update prices
+        # Staff with can_edit_prices can only update prices
         sku = old["sku"]
         name = old["name"]
         note = old["note"]
