@@ -7,14 +7,24 @@
   <div class="card-body">
     <form method="post">
       <div class="row g-2">
-        <div class="col-md-4"><input class="form-control" name="username" placeholder="username" required></div>
-        <div class="col-md-4"><input class="form-control" name="password" placeholder="password" required></div>
-        <div class="col-md-4">
+        <div class="col-md-3"><input class="form-control" name="username" placeholder="username" required></div>
+        <div class="col-md-3"><input class="form-control" name="password" placeholder="password" required></div>
+        <div class="col-md-3">
           <select class="form-select" name="role">
             <option value="staff">staff</option>
             <option value="manager">manager</option>
             <option value="admin">admin</option>
           </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-center gap-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="can_view_prices" value="1" id="create_can_view_prices">
+            <label class="form-check-label" for="create_can_view_prices">View prices</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="can_edit_prices" value="1" id="create_can_edit_prices">
+            <label class="form-check-label" for="create_can_edit_prices">Edit prices</label>
+          </div>
         </div>
       </div>
       <button class="btn btn-success fw-bold w-100 mt-2">Create</button>
@@ -26,7 +36,16 @@
   <div class="card-header fw-bold">Users</div>
   <div class="card-body p-0">
     <table class="table table-bordered mb-0">
-      <thead class="table-light"><tr><th>ID</th><th>Username</th><th>Role</th><th>Reset pass</th><th>Delete</th></tr></thead>
+      <thead class="table-light">
+        <tr>
+          <th>ID</th>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Permissions</th>
+          <th>Reset pass</th>
+          <th>Delete</th>
+        </tr>
+      </thead>
       <tbody>
         {% for u in users %}
         <tr>
@@ -40,6 +59,21 @@
                 <option value="admin" {% if u.role=='admin' %}selected{% endif %}>admin</option>
               </select>
               <button class="btn btn-sm btn-warning fw-bold">Save</button>
+            </form>
+          </td>
+          <td>
+            <form method="post" action="/staff/{{ u.id }}/permissions" class="d-flex align-items-center gap-3">
+              <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" name="can_view_prices" value="1"
+                       id="vp_{{ u.id }}" {% if u.can_view_prices %}checked{% endif %}>
+                <label class="form-check-label" for="vp_{{ u.id }}">View prices</label>
+              </div>
+              <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" name="can_edit_prices" value="1"
+                       id="ep_{{ u.id }}" {% if u.can_edit_prices %}checked{% endif %}>
+                <label class="form-check-label" for="ep_{{ u.id }}">Edit prices</label>
+              </div>
+              <button class="btn btn-sm btn-outline-info">Save</button>
             </form>
           </td>
           <td>

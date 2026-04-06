@@ -205,12 +205,16 @@
             </div>
 
             <div class="col-12 d-flex align-items-center justify-content-between">
+              {% if can_edit_prices %}
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="update_cost" name="update_cost" value="1">
                 <label class="form-check-label" for="update_cost">
                   {{ t('update_product_cost') if t else 'Update product cost' }}
                 </label>
               </div>
+              {% else %}
+              <div></div>
+              {% endif %}
               <button class="btn btn-success fw-bold">{{ t('stock_in') if t else 'IN' }}</button>
             </div>
           </form>
@@ -290,7 +294,8 @@
             <div class="col-6">
               <label class="form-label mb-1">{{ t('cost') if t else 'Cost' }}</label>
               <div class="input-group">
-                <input class="form-control" name="cost" type="number" step="0.01" min="0" value="0">
+                <input class="form-control" name="cost" type="number" step="0.01" min="0" value="0"
+                       {% if not can_edit_prices %}disabled{% endif %}>
                 <span class="input-group-text">đ</span>
               </div>
             </div>
@@ -298,7 +303,8 @@
             <div class="col-6">
               <label class="form-label mb-1">{{ t('sell_price') if t else 'Sell price' }}</label>
               <div class="input-group">
-                <input class="form-control" name="sell_price" type="number" step="0.01" min="0" value="0">
+                <input class="form-control" name="sell_price" type="number" step="0.01" min="0" value="0"
+                       {% if not can_edit_prices %}disabled{% endif %}>
                 <span class="input-group-text">đ</span>
               </div>
             </div>
@@ -381,11 +387,13 @@
             </button>
           </div>
           <div class="col-md-3 text-md-end">
+            {% if can_view_prices %}
             {% for p in products %}
               {% set ns.total_capital = ns.total_capital + ((p.on_hand or 0) * (p.cost or 0)) %}
             {% endfor %}
             <div class="text-muted small">{{ t('total_capital') if t else 'Total capital' }}</div>
             <div class="fs-5 fw-bold">{{ "%.0f"|format(ns.total_capital) }} đ</div>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -407,8 +415,10 @@
               <th style="width:110px">{{ t('total_in') if t else 'In' }}</th>
               <th style="width:110px">{{ t('on_hand') if t else 'On hand' }}</th>
               <th style="width:140px">{{ t('out_today') if t else 'Out today' }}</th>
+              {% if can_view_prices %}
               <th style="width:110px">{{ t('cost') if t else 'Cost' }}</th>
               <th style="width:110px">{{ t('sell_price') if t else 'Sell' }}</th>
+              {% endif %}
               <th>{{ t('note') if t else 'Note' }}</th>
               <th class="no-print" style="width:120px">{{ t('actions') if t else 'Actions' }}</th>
             </tr>
@@ -425,8 +435,8 @@
                     "id": {{ p.id|tojson }},
                     "sku": {{ (p.sku or "")|tojson }},
                     "name": {{ (p.name or "")|tojson }},
-                    "cost": {{ (p.cost or 0)|tojson }},
-                    "sell_price": {{ (p.sell_price or 0)|tojson }},
+                    "cost": {{ (p.cost or 0 if can_view_prices else 0)|tojson }},
+                    "sell_price": {{ (p.sell_price or 0 if can_view_prices else 0)|tojson }},
                     "note": {{ (p.note or "")|tojson }},
                     "low_stock_enabled": {{ (p.low_stock_enabled or 0)|tojson }},
                     "low_stock_threshold": {{ (p.low_stock_threshold or 0)|tojson }},
@@ -459,21 +469,27 @@
                 <td><b>{{ onhand }}</b></td>
                 <td>{{ p.out_today or 0 }}</td>
 
+                {% if can_view_prices %}
                 <td>{{ "%.0f"|format(p.cost or 0) }}</td>
                 <td>{{ "%.0f"|format(p.sell_price or 0) }}</td>
+                {% endif %}
 
                 <td class="text-muted">{{ p.note or '' }}</td>
 
                 <td class="no-print">
                   <div class="d-flex gap-1">
+                    {% if can_edit_prices or session.get('role') in ('admin', 'manager') %}
                     <button class="btn btn-sm btn-outline-primary btn-edit" type="button">
                       {{ t('edit') if t else 'Edit' }}
                     </button>
+                    {% endif %}
+                    {% if session.get('role') in ('admin', 'manager') %}
                     <form method="post" action="/product/deactivate/{{ p.id }}" onsubmit="return confirm('{{ t('confirm_delete') if t else 'Delete (soft)?' }}');">
                       <button class="btn btn-sm btn-outline-danger" type="submit">
                         {{ t('delete') if t else 'Delete' }}
                       </button>
                     </form>
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -561,7 +577,8 @@
         <div class="col-md-6">
           <label class="form-label mb-1">{{ t('cost') if t else 'Cost' }}</label>
           <div class="input-group">
-            <input class="form-control" name="cost" id="m_cost" type="number" min="0" step="0.01">
+            <input class="form-control" name="cost" id="m_cost" type="number" min="0" step="0.01"
+                   {% if not can_edit_prices %}disabled{% endif %}>
             <span class="input-group-text">đ</span>
           </div>
         </div>
@@ -569,7 +586,8 @@
         <div class="col-md-6">
           <label class="form-label mb-1">{{ t('sell_price') if t else 'Sell price' }}</label>
           <div class="input-group">
-            <input class="form-control" name="sell_price" id="m_sell_price" type="number" min="0" step="0.01">
+            <input class="form-control" name="sell_price" id="m_sell_price" type="number" min="0" step="0.01"
+                   {% if not can_edit_prices %}disabled{% endif %}>
             <span class="input-group-text">đ</span>
           </div>
         </div>

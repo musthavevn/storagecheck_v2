@@ -1,6 +1,6 @@
 # app/routes/inventory_routes.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from ..auth import login_required, admin_or_manager
+from ..auth import login_required, admin_or_manager, has_permission
 from ..db import get_db
 from ..services.inventory import CartItem, create_sale_and_deduct_stock, get_on_hand
 
@@ -53,7 +53,9 @@ def index():
     """
     ).fetchall()
 
-    return render_template("index.html", products=rows, cart=_cart(), s=s)
+    return render_template("index.html", products=rows, cart=_cart(), s=s,
+                           can_view_prices=has_permission("can_view_prices"),
+                           can_edit_prices=has_permission("can_edit_prices"))
 
 
 @inventory_bp.post("/product/add")
@@ -95,18 +97,40 @@ def product_add():
 
 
 @inventory_bp.post("/product/update")
-@admin_or_manager
+@login_required
 def product_update():
     db = get_db()
+    role = session.get("role")
+
+    # Staff need explicit can_edit_prices permission
+    if role == "staff" and not has_permission("can_edit_prices"):
+        flash("Permission denied", "danger")
+        return redirect(url_for("inventory.index"))
+
     product_id = int(request.form.get("product_id"))
-    sku = (request.form.get("sku") or "").strip() or None
-    name = (request.form.get("name") or "").strip()
+    old = db.execute("SELECT * FROM products WHERE id=? AND is_active=1", (product_id,)).fetchone()
+    if not old:
+        flash("Product not found", "danger")
+        return redirect(url_for("inventory.index"))
+
     cost = float(request.form.get("cost", "0") or 0)
     sell_price = float(request.form.get("sell_price", "0") or 0)
-    note = (request.form.get("note") or "").strip()
-    low_stock_enabled = 1 if (request.form.get("low_stock_enabled") in ("1", "on", "true", "yes")) else 0
-    low_stock_threshold = float(request.form.get("low_stock_threshold", "0") or 0)
-    email_enabled = 1 if (request.form.get("email_enabled") in ("1", "on", "true", "yes")) else 0
+
+    if role == "staff":
+        # Staff with can_edit_prices can only update prices
+        sku = old["sku"]
+        name = old["name"]
+        note = old["note"]
+        low_stock_enabled = old["low_stock_enabled"]
+        low_stock_threshold = old["low_stock_threshold"]
+        email_enabled = old["email_enabled"]
+    else:
+        sku = (request.form.get("sku") or "").strip() or None
+        name = (request.form.get("name") or "").strip()
+        note = (request.form.get("note") or "").strip()
+        low_stock_enabled = 1 if (request.form.get("low_stock_enabled") in ("1", "on", "true", "yes")) else 0
+        low_stock_threshold = float(request.form.get("low_stock_threshold", "0") or 0)
+        email_enabled = 1 if (request.form.get("email_enabled") in ("1", "on", "true", "yes")) else 0
 
     if not name:
         flash("Name required", "danger")
@@ -120,6 +144,17 @@ def product_update():
                WHERE id=?""",
             (sku, name, cost, sell_price, note, low_stock_enabled, low_stock_threshold, email_enabled, product_id),
         )
+
+        # Record price history if cost or sell_price changed
+        if float(old["cost"]) != cost or float(old["sell_price"]) != sell_price:
+            actor = int(session.get("user_id") or 0) or None
+            db.execute(
+                """INSERT INTO price_history
+                     (product_id, product_name, changed_by, old_cost, new_cost, old_sell_price, new_sell_price)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (product_id, name, actor, float(old["cost"]), cost, float(old["sell_price"]), sell_price),
+            )
+
         _audit(
             db,
             "PRODUCT_UPDATE",

@@ -13,13 +13,15 @@ def staff_page():
         username = (request.form.get("username") or "").strip()
         pw = request.form.get("password") or ""
         role = request.form.get("role") or "staff"
+        can_view_prices = 1 if request.form.get("can_view_prices") else 0
+        can_edit_prices = 1 if request.form.get("can_edit_prices") else 0
         if not username or not pw:
             flash("Missing username/password", "danger")
             return redirect(url_for("staff.staff_page"))
         try:
             db.execute(
-                "INSERT INTO users(username,password_hash,role) VALUES (?,?,?)",
-                (username, hash_password(pw), role),
+                "INSERT INTO users(username,password_hash,role,can_view_prices,can_edit_prices) VALUES (?,?,?,?,?)",
+                (username, hash_password(pw), role, can_view_prices, can_edit_prices),
             )
             db.commit()
             flash("Created user", "success")
@@ -29,7 +31,7 @@ def staff_page():
         return redirect(url_for("staff.staff_page"))
 
     users = db.execute(
-        "SELECT id,username,role,created_at FROM users ORDER BY id DESC"
+        "SELECT id,username,role,can_view_prices,can_edit_prices,created_at FROM users ORDER BY id DESC"
     ).fetchall()
     return render_template("staff.html", users=users)
 
@@ -41,6 +43,20 @@ def staff_set_role(user_id: int):
     db.execute("UPDATE users SET role=? WHERE id=?", (role, user_id))
     db.commit()
     flash("Updated role", "success")
+    return redirect(url_for("staff.staff_page"))
+
+@staff_bp.post("/staff/<int:user_id>/permissions")
+@admin_or_manager
+def staff_set_permissions(user_id: int):
+    can_view_prices = 1 if request.form.get("can_view_prices") else 0
+    can_edit_prices = 1 if request.form.get("can_edit_prices") else 0
+    db = get_db()
+    db.execute(
+        "UPDATE users SET can_view_prices=?, can_edit_prices=? WHERE id=?",
+        (can_view_prices, can_edit_prices, user_id),
+    )
+    db.commit()
+    flash("Updated permissions", "success")
     return redirect(url_for("staff.staff_page"))
 
 @staff_bp.post("/staff/<int:user_id>/reset-pass")
