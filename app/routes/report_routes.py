@@ -79,6 +79,9 @@ def report_price_history():
     ).fetchall()
 
     return render_template("report_price_history.html", rows=rows, limit=limit)
+
+@report_bp.get("/report/activity")
+@admin_or_manager
 def report_activity():
     db = get_db()
 
