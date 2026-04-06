@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK(role IN ('admin','manager','staff')),
+  can_view_prices INTEGER NOT NULL DEFAULT 0,
+  can_edit_prices INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -94,6 +96,20 @@ CREATE TABLE IF NOT EXISTS settings (
   theme_section_border TEXT NOT NULL DEFAULT '#e9ecef'
 );
 
+CREATE TABLE IF NOT EXISTS price_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL,
+  product_name TEXT NOT NULL,
+  changed_by INTEGER,
+  old_cost REAL NOT NULL DEFAULT 0,
+  new_cost REAL NOT NULL DEFAULT 0,
+  old_sell_price REAL NOT NULL DEFAULT 0,
+  new_sell_price REAL NOT NULL DEFAULT 0,
+  changed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(product_id) REFERENCES products(id),
+  FOREIGN KEY(changed_by) REFERENCES users(id)
+);
+
 INSERT OR IGNORE INTO settings(id) VALUES (1);
 """
 
@@ -129,6 +145,13 @@ def _ensure_settings_migrations(db):
     if "banner_path" not in cols:
         db.execute("ALTER TABLE settings ADD COLUMN banner_path TEXT NOT NULL DEFAULT ''")
 
+def _ensure_users_permissions_migrations(db):
+    cols = _table_columns(db, "users")
+    if "can_view_prices" not in cols:
+        db.execute("ALTER TABLE users ADD COLUMN can_view_prices INTEGER NOT NULL DEFAULT 0")
+    if "can_edit_prices" not in cols:
+        db.execute("ALTER TABLE users ADD COLUMN can_edit_prices INTEGER NOT NULL DEFAULT 0")
+
 def _ensure_audit_logs_table(db):
     db.execute(
         """CREATE TABLE IF NOT EXISTS audit_logs (
@@ -140,6 +163,23 @@ def _ensure_audit_logs_table(db):
           detail TEXT NOT NULL DEFAULT '',
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
           FOREIGN KEY(actor_user_id) REFERENCES users(id)
+        );"""
+    )
+
+def _ensure_price_history_table(db):
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS price_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          product_name TEXT NOT NULL,
+          changed_by INTEGER,
+          old_cost REAL NOT NULL DEFAULT 0,
+          new_cost REAL NOT NULL DEFAULT 0,
+          old_sell_price REAL NOT NULL DEFAULT 0,
+          new_sell_price REAL NOT NULL DEFAULT 0,
+          changed_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(product_id) REFERENCES products(id),
+          FOREIGN KEY(changed_by) REFERENCES users(id)
         );"""
     )
 
@@ -166,6 +206,8 @@ def init_db(app):
         _ensure_products_migrations(db)
         _ensure_settings_migrations(db)
         _ensure_audit_logs_table(db)
+        _ensure_users_permissions_migrations(db)
+        _ensure_price_history_table(db)
 
         db.commit()
 

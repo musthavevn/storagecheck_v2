@@ -49,8 +49,36 @@ def report_mine():
         tong_thu=tong_thu,
     )
 
-@report_bp.get("/report/activity")
+@report_bp.get("/report/price-history")
 @admin_or_manager
+def report_price_history():
+    db = get_db()
+
+    limit = int(request.args.get("limit", 200))
+    if limit < 50:
+        limit = 50
+    if limit > 1000:
+        limit = 1000
+
+    rows = db.execute(
+        """
+        SELECT ph.changed_at,
+               ph.product_id,
+               ph.product_name,
+               ph.old_cost,
+               ph.new_cost,
+               ph.old_sell_price,
+               ph.new_sell_price,
+               u.username
+        FROM price_history ph
+        LEFT JOIN users u ON u.id = ph.changed_by
+        ORDER BY ph.id DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+
+    return render_template("report_price_history.html", rows=rows, limit=limit)
 def report_activity():
     db = get_db()
 

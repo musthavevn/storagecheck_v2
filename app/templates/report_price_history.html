@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h3 class="mb-0">Price change history</h3>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="/report/summary">Summary</a>
+    <a class="btn btn-outline-secondary" href="/report/mine">Mine</a>
+    <a class="btn btn-outline-secondary" href="/report/activity">Activity</a>
+    <a class="btn btn-primary" href="/report/price-history">Price history</a>
+  </div>
+</div>
+
+<form class="row g-2 mb-3" method="get" action="/report/price-history">
+  <div class="col-auto">
+    <label class="form-label mb-1">Limit</label>
+    <input class="form-control" type="number" name="limit"
+           min="50" max="1000" step="50" value="{{ limit }}">
+  </div>
+  <div class="col-auto d-flex align-items-end">
+    <button class="btn btn-dark">Apply</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-header fw-bold">Price edits</div>
+  <div class="card-body p-0">
+    <table class="table table-sm table-striped mb-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width:190px">Time</th>
+          <th style="width:140px">User</th>
+          <th style="width:160px">Product</th>
+          <th style="width:130px">Old cost</th>
+          <th style="width:130px">New cost</th>
+          <th style="width:130px">Old sell</th>
+          <th style="width:130px">New sell</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="text-muted">{{ r.changed_at }}</td>
+            <td>{{ r.username or '-' }}</td>
+            <td>{{ r.product_name }} <span class="text-muted">#{{ r.product_id }}</span></td>
+            <td>{{ "%.0f"|format(r.old_cost) }} đ</td>
+            <td {% if r.new_cost != r.old_cost %}class="fw-bold text-primary"{% endif %}>
+              {{ "%.0f"|format(r.new_cost) }} đ
+            </td>
+            <td>{{ "%.0f"|format(r.old_sell_price) }} đ</td>
+            <td {% if r.new_sell_price != r.old_sell_price %}class="fw-bold text-primary"{% endif %}>
+              {{ "%.0f"|format(r.new_sell_price) }} đ
+            </td>
+          </tr>
+        {% endfor %}
+
+        {% if not rows %}
+          <tr><td colspan="7" class="text-center text-muted p-3">No price changes recorded yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

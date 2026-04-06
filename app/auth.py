@@ -20,8 +20,26 @@ def login_user(username: str, password: str):
     session["user_id"] = user["id"]
     session["username"] = user["username"]
     session["role"] = user["role"]
+    # Load per-user permissions into session (admin/manager always True)
+    role = user["role"]
+    if role in ("admin", "manager"):
+        session["can_view_prices"] = True
+        session["can_edit_prices"] = True
+    else:
+        session["can_view_prices"] = bool(user["can_view_prices"])
+        session["can_edit_prices"] = bool(user["can_edit_prices"])
     session.setdefault("cart", [])
     return True, user
+
+def has_permission(perm: str) -> bool:
+    """Return True if the current user has the given permission.
+    Admin and manager always have all permissions.
+    Staff users are checked against their session permission flags.
+    """
+    role = session.get("role")
+    if role in ("admin", "manager"):
+        return True
+    return bool(session.get(perm, False))
 
 def logout_user():
     session.clear()
