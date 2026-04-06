@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3">Summary report</h4>
+
+<form class="row g-2 mb-3">
+  <div class="col-md-3">
+    <select class="form-select" name="period">
+      <option value="today" {% if period=='today' %}selected{% endif %}>today</option>
+      <option value="month" {% if period=='month' %}selected{% endif %}>month</option>
+      <option value="6months" {% if period=='6months' %}selected{% endif %}>6months</option>
+      <option value="12months" {% if period=='12months' %}selected{% endif %}>12months</option>
+      <option value="custom" {% if period=='custom' %}selected{% endif %}>custom</option>
+    </select>
+  </div>
+  <div class="col-md-3"><input class="form-control" type="date" name="tu_ngay"></div>
+  <div class="col-md-3"><input class="form-control" type="date" name="den_ngay"></div>
+  <div class="col-md-3"><button class="btn btn-success w-100 fw-bold">View</button></div>
+</form>
+
+<div class="card">
+  <div class="card-body">
+    <div><b>Range:</b> {{ start }} → {{ end }}</div>
+    <hr>
+    <div><b>So phieu:</b> {{ totals.so_phieu }}</div>
+    <div><b>Tong ban:</b> {{ totals.tong_ban }}</div>
+    <div><b>Tong von:</b> {{ totals.tong_von }}</div>
+    <div><b>Tong chi phi:</b> {{ tong_chi_phi }}</div>
+    <div><b>Loi nhuan:</b> {{ loi_nhuan }}</div>
+  </div>
+</div>
+{% endblock %}

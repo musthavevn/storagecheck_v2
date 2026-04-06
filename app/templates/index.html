@@ -1,0 +1,775 @@
+{% extends "base.html" %}
+{% block content %}
+{% set ns = namespace(total_capital=0) %}
+
+{# Theme variables from settings #}
+{% set theme_primary = (s.theme_primary if s and s.theme_primary else '#0d6efd') %}
+{% set theme_section_bg = (s.theme_section_bg if s and s.theme_section_bg else '#f8f9fa') %}
+{% set theme_section_border = (s.theme_section_border if s and s.theme_section_border else '#e9ecef') %}
+
+<style>
+  :root{
+    --theme-primary: {{ theme_primary }};
+    --section-bg: {{ theme_section_bg }};
+    --section-border: {{ theme_section_border }};
+  }
+
+  .section-card{
+    border: 1px solid var(--section-border);
+    background: var(--section-bg);
+    border-radius: .75rem;
+    padding: .75rem;
+    margin-bottom: .75rem;
+  }
+  .section-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-weight:800;
+    padding:.5rem .75rem;
+    border-radius:.6rem;
+    border:1px solid var(--section-border);
+    background: rgba(255,255,255,.65);
+    margin-bottom:.75rem;
+  }
+  .section-title .hint{
+    font-weight:600;
+    font-size:.85rem;
+    color:#6c757d;
+  }
+  .form-hint{ font-size:.82rem; color:#6c757d; }
+  .table td{ vertical-align: middle; }
+  .pill{
+    display:inline-block;
+    padding:.15rem .45rem;
+    border-radius:999px;
+    border:1px solid rgba(0,0,0,.1);
+    font-size:.8rem;
+    color:#6c757d;
+    background: rgba(255,255,255,.65);
+  }
+  .btn-primary{
+    background: var(--theme-primary);
+    border-color: var(--theme-primary);
+  }
+  .btn-outline-primary{
+    border-color: var(--theme-primary);
+    color: var(--theme-primary);
+  }
+  .btn-outline-primary:hover{
+    background: var(--theme-primary);
+    color: #fff;
+  }
+
+  .banner-card{
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: .9rem;
+    overflow:hidden;
+    margin-bottom: 1rem;
+
+    /* fixed size */
+    height: 180px;        /* bạn có thể đổi 160/200 tuỳ ý */
+    background: #f8f9fa;
+  }
+
+  .banner-card img{
+    width: 100%;
+    height: 100%;
+
+    /* auto fit */
+    object-fit: cover;     /* cover: full khung, có thể bị cắt nhẹ */
+    object-position: center;
+    display:block;
+  }
+
+  .banner-placeholder{
+    height: 180px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    padding: 1rem;
+    background: rgba(13,110,253,.06);
+    text-align:center;
+  }
+
+  /* Make modal look OK even if bootstrap js isn't loaded (still works via our JS) */
+  .modal-backdrop-custom{
+    position:fixed; inset:0;
+    background: rgba(0,0,0,.35);
+    display:none;
+    z-index: 1040;
+  }
+  .modal-custom{
+    position:fixed;
+    left:50%; top:50%;
+    transform: translate(-50%,-50%);
+    width:min(720px, 92vw);
+    background:#fff;
+    border-radius:.9rem;
+    border:1px solid rgba(0,0,0,.12);
+    box-shadow:0 12px 36px rgba(0,0,0,.22);
+    display:none;
+    z-index: 1050;
+  }
+  .modal-custom .modal-header{
+    padding:.85rem 1rem;
+    border-bottom:1px solid rgba(0,0,0,.08);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .modal-custom .modal-body{ padding: 1rem; }
+  .modal-custom .modal-footer{
+    padding: .85rem 1rem;
+    border-top:1px solid rgba(0,0,0,.08);
+    display:flex; gap:.5rem; justify-content:flex-end; flex-wrap:wrap;
+  }
+
+  /* Print: hide left column and cart by default, print list + banner */
+  @media print{
+    .no-print{ display:none !important; }
+    .col-lg-4{ display:none !important; }
+    .card.border-danger{ display:none !important; }
+    .banner-card{ margin-bottom: .5rem; }
+  }
+</style>
+
+{# Banner panel (top) #}
+<div class="banner-card">
+  {% if s and s.banner_path %}
+    <img alt="banner" src="/instance/{{ s.banner_path }}">
+  {% elif s and s.banner_b64 and (s.banner_b64|length) > 10 %}
+    <img alt="banner" src="data:image/*;base64,{{ s.banner_b64 }}">
+  {% else %}
+    <div class="banner-placeholder">
+      <div class="fw-bold">Banner</div>
+      <div class="text-muted">Go to Settings to upload a banner (recommended 1200×180).</div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <!-- LEFT: operations -->
+  <div class="col-lg-4 no-print">
+
+    <div class="card mb-3">
+      <div class="card-header fw-bold">{{ t('actions') if t else 'Actions' }}</div>
+      <div class="card-body">
+
+        <datalist id="productList">
+          {% for p in products %}
+            <option value="{{ p.id }} | {{ p.sku or '' }} | {{ p.name }}"></option>
+          {% endfor %}
+        </datalist>
+
+        <!-- Stock In -->
+        <div class="section-card">
+          <div class="section-title">
+            <span>{{ t('stock_in') if t else 'Stock In' }}</span>
+            <span class="hint">{{ t('admin_manager') if t else 'admin/manager' }}</span>
+          </div>
+
+          <form method="post" action="/stock/in" class="row g-2" id="stockInForm">
+            <div class="col-12">
+              <label class="form-label mb-1">{{ t('product') if t else 'Product' }}</label>
+              <input class="form-control"
+                     name="product_pick"
+                     list="productList"
+                     placeholder="{{ t('type_to_search_product') if t else 'Type to search by ID / SKU / Name...' }}"
+                     autocomplete="off"
+                     required>
+              <input type="hidden" name="product_id" id="stockIn_product_id">
+              <div class="form-hint mt-1">
+                {{ t('on_hand_now') if t else 'On hand now' }}: <b id="stockIn_on_hand">—</b>
+              </div>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label mb-1">{{ t('quantity') if t else 'Quantity' }}</label>
+              <div class="input-group">
+                <input class="form-control" name="qty" id="stockIn_qty" type="number" min="0.01" step="0.01" value="1" required>
+                <span class="input-group-text">qty</span>
+              </div>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label mb-1">{{ t('unit_cost') if t else 'Unit cost' }}</label>
+              <div class="input-group">
+                <input class="form-control" name="unit_cost" id="stockIn_unit_cost" type="number" min="0" step="0.01" value="0" required>
+                <span class="input-group-text">đ</span>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label mb-1">{{ t('note') if t else 'Note' }}</label>
+              <input class="form-control" name="note" placeholder="{{ t('optional') if t else 'Optional' }}">
+            </div>
+
+            <div class="col-12 d-flex align-items-center justify-content-between">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="update_cost" name="update_cost" value="1">
+                <label class="form-check-label" for="update_cost">
+                  {{ t('update_product_cost') if t else 'Update product cost' }}
+                </label>
+              </div>
+              <button class="btn btn-success fw-bold">{{ t('stock_in') if t else 'IN' }}</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Stock Out (Sale add to cart) -->
+        <div class="section-card">
+          <div class="section-title">
+            <span>{{ t('stock_out_sale') if t else 'Stock Out (Sale)' }}</span>
+            <span class="hint">{{ t('add_to_cart') if t else 'Add to cart' }}</span>
+          </div>
+
+          <form method="post" action="/cart/add" class="row g-2" id="stockOutForm">
+            <div class="col-12">
+              <label class="form-label mb-1">{{ t('product') if t else 'Product' }}</label>
+              <input class="form-control"
+                     name="product_pick"
+                     list="productList"
+                     placeholder="{{ t('type_to_search_product') if t else 'Type to search by ID / SKU / Name...' }}"
+                     autocomplete="off"
+                     required>
+              <input type="hidden" name="product_id" id="stockOut_product_id">
+              <div class="form-hint mt-1">
+                {{ t('on_hand_now') if t else 'On hand now' }}: <b id="stockOut_on_hand">—</b>
+              </div>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label mb-1">{{ t('quantity') if t else 'Quantity' }}</label>
+              <div class="input-group">
+                <input class="form-control" name="qty" id="stockOut_qty" type="number" min="0.01" step="0.01" value="1" required>
+                <span class="input-group-text">qty</span>
+              </div>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label mb-1">{{ t('unit_price') if t else 'Unit price' }}</label>
+              <div class="input-group">
+                <input class="form-control" name="unit_price" id="stockOut_unit_price" type="number" min="0" step="0.01"
+                       placeholder="{{ t('auto_fill') if t else 'Auto fill' }}">
+                <span class="input-group-text">đ</span>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label mb-1">{{ t('note') if t else 'Note' }}</label>
+              <input class="form-control" name="note" placeholder="{{ t('optional') if t else 'Optional' }}">
+              <div class="form-hint mt-1">
+                {{ t('price_auto_from_sell_price') if t else 'If price is empty/0, system uses default sell price.' }}
+              </div>
+            </div>
+
+            <div class="col-12">
+              <button class="btn btn-danger fw-bold w-100">{{ t('add_to_cart') if t else 'Add to cart' }}</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Add Product -->
+        <div class="section-card">
+          <div class="section-title">
+            <span>{{ t('add_product') if t else 'Add product' }}</span>
+            <span class="hint">{{ t('admin_manager') if t else 'admin/manager' }}</span>
+          </div>
+
+          <form method="post" action="/product/add" class="row g-2">
+            <div class="col-12">
+              <label class="form-label mb-1">SKU</label>
+              <input class="form-control" name="sku" placeholder="{{ t('optional') if t else 'Optional' }}">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label mb-1">{{ t('name') if t else 'Name' }}</label>
+              <input class="form-control" name="name" placeholder="{{ t('product_name') if t else 'Product name' }}" required>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label mb-1">{{ t('cost') if t else 'Cost' }}</label>
+              <div class="input-group">
+                <input class="form-control" name="cost" type="number" step="0.01" min="0" value="0">
+                <span class="input-group-text">đ</span>
+              </div>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label mb-1">{{ t('sell_price') if t else 'Sell price' }}</label>
+              <div class="input-group">
+                <input class="form-control" name="sell_price" type="number" step="0.01" min="0" value="0">
+                <span class="input-group-text">đ</span>
+              </div>
+            </div>
+
+            <div class="col-6">
+              <div class="form-check mt-4">
+                <input class="form-check-input" type="checkbox" id="low_stock_enabled" name="low_stock_enabled" value="1">
+                <label class="form-check-label" for="low_stock_enabled">
+                  {{ t('low_stock_alert') if t else 'Low stock alert' }}
+                </label>
+              </div>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label mb-1">{{ t('threshold') if t else 'Threshold' }}</label>
+              <div class="input-group">
+                <input class="form-control" name="low_stock_threshold" type="number" step="0.01" min="0" value="0">
+                <span class="input-group-text">qty</span>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="email_enabled" name="email_enabled" value="1">
+                <label class="form-check-label" for="email_enabled">
+                  {{ t('email_alert') if t else 'Email alert' }}
+                </label>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label mb-1">{{ t('note') if t else 'Note' }}</label>
+              <input class="form-control" name="note" placeholder="{{ t('optional') if t else 'Optional' }}">
+            </div>
+
+            <div class="col-12">
+              <button class="btn btn-primary fw-bold w-100">{{ t('create') if t else 'Create' }}</button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Time / Calendar -->
+    <div class="card mb-3">
+      <div class="card-header fw-bold">{{ t('time_calendar') if t else 'Time / Calendar' }}</div>
+      <div class="card-body">
+        <div class="d-flex align-items-end justify-content-between">
+          <div>
+            <div class="text-muted small">{{ t('time') if t else 'Time' }}</div>
+            <div class="fs-3 fw-bold" id="clock">--:--:--</div>
+          </div>
+          <div class="text-end">
+            <div class="text-muted small">{{ t('solar_date') if t else 'Date' }}</div>
+            <div class="fw-bold" id="solarDate">--/--/----</div>
+            <div class="text-muted small mt-2">{{ t('lunar_date') if t else 'Lunar' }}</div>
+            <div class="fw-bold" id="lunarDate">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT -->
+  <div class="col-lg-8">
+    <!-- header row -->
+    <div class="card mb-3 no-print">
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label mb-1">{{ t('search') if t else 'Search' }}</label>
+            <input class="form-control" id="productSearch" placeholder="{{ t('search_hint') if t else 'Search by SKU / ID / Name / note...' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label mb-1">{{ t('print') if t else 'Print' }}</label>
+            <button class="btn btn-outline-dark w-100" type="button" onclick="window.print()">
+              {{ t('print') if t else 'Print' }}
+            </button>
+          </div>
+          <div class="col-md-3 text-md-end">
+            {% for p in products %}
+              {% set ns.total_capital = ns.total_capital + ((p.on_hand or 0) * (p.cost or 0)) %}
+            {% endfor %}
+            <div class="text-muted small">{{ t('total_capital') if t else 'Total capital' }}</div>
+            <div class="fs-5 fw-bold">{{ "%.0f"|format(ns.total_capital) }} đ</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- product list -->
+    <div class="card mb-3">
+      <div class="card-header fw-bold d-flex align-items-center justify-content-between">
+        <span>{{ t('product_list') if t else 'Product list' }}</span>
+        <span class="pill">{{ t('dblclick_to_edit') if t else 'Double click a row to edit' }}</span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0 align-middle" id="productTable">
+          <thead class="table-light">
+            <tr>
+              <th style="width:140px">{{ t('code_id') if t else 'Code / ID' }}</th>
+              <th>{{ t('name') if t else 'Name' }}</th>
+              <th style="width:160px">{{ t('status') if t else 'Status' }}</th>
+              <th style="width:110px">{{ t('total_in') if t else 'In' }}</th>
+              <th style="width:110px">{{ t('on_hand') if t else 'On hand' }}</th>
+              <th style="width:140px">{{ t('out_today') if t else 'Out today' }}</th>
+              <th style="width:110px">{{ t('cost') if t else 'Cost' }}</th>
+              <th style="width:110px">{{ t('sell_price') if t else 'Sell' }}</th>
+              <th>{{ t('note') if t else 'Note' }}</th>
+              <th class="no-print" style="width:120px">{{ t('actions') if t else 'Actions' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in products %}
+              {% set onhand = (p.on_hand or 0) %}
+              {% set low_enabled = (p.low_stock_enabled or 0) %}
+              {% set low_th = (p.low_stock_threshold or 0) %}
+
+              <tr class="product-row"
+                  data-search="{{ (p.sku or '') }} {{ p.id }} {{ p.name }} {{ p.note or '' }}"
+                  data-product='{
+                    "id": {{ p.id|tojson }},
+                    "sku": {{ (p.sku or "")|tojson }},
+                    "name": {{ (p.name or "")|tojson }},
+                    "cost": {{ (p.cost or 0)|tojson }},
+                    "sell_price": {{ (p.sell_price or 0)|tojson }},
+                    "note": {{ (p.note or "")|tojson }},
+                    "low_stock_enabled": {{ (p.low_stock_enabled or 0)|tojson }},
+                    "low_stock_threshold": {{ (p.low_stock_threshold or 0)|tojson }},
+                    "email_enabled": {{ (p.email_enabled or 0)|tojson }}
+                  }'>
+                <td>
+                  <div class="fw-bold">{{ p.sku or ('#' ~ p.id) }}</div>
+                  <div class="text-muted small">ID: {{ p.id }}</div>
+                </td>
+
+                <td>
+                  <div class="fw-bold">{{ p.name }}</div>
+                </td>
+
+                <td>
+                  {% if low_enabled %}
+                    {% if onhand <= 0 %}
+                      <span class="badge text-bg-danger">{{ t('out_of_stock') if t else 'OUT OF STOCK' }}</span>
+                    {% elif onhand <= low_th %}
+                      <span class="badge text-bg-warning">{{ t('low_stock') if t else 'LOW' }} (≤ {{ low_th }})</span>
+                    {% else %}
+                      <span class="badge text-bg-success">OK</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+
+                <td>{{ p.total_in or 0 }}</td>
+                <td><b>{{ onhand }}</b></td>
+                <td>{{ p.out_today or 0 }}</td>
+
+                <td>{{ "%.0f"|format(p.cost or 0) }}</td>
+                <td>{{ "%.0f"|format(p.sell_price or 0) }}</td>
+
+                <td class="text-muted">{{ p.note or '' }}</td>
+
+                <td class="no-print">
+                  <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-primary btn-edit" type="button">
+                      {{ t('edit') if t else 'Edit' }}
+                    </button>
+                    <form method="post" action="/product/deactivate/{{ p.id }}" onsubmit="return confirm('{{ t('confirm_delete') if t else 'Delete (soft)?' }}');">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">
+                        {{ t('delete') if t else 'Delete' }}
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+            {% if not products %}
+              <tr><td colspan="10" class="text-center text-muted">{{ t('no_products') if t else 'No products' }}</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Cart -->
+    <div class="card border-danger mb-3 no-print">
+      <div class="card-header bg-danger text-white fw-bold">
+        {{ t('cart') if t else 'Cart' }} ({{ cart|length }})
+      </div>
+      <div class="card-body">
+        {% if cart|length == 0 %}
+          <div class="text-muted">{{ t('cart_empty') if t else 'Cart empty' }}</div>
+        {% else %}
+          <table class="table table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th>{{ t('item') if t else 'Item' }}</th>
+                <th>{{ t('quantity') if t else 'Qty' }}</th>
+                <th>{{ t('unit_price') if t else 'Price' }}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in cart %}
+              <tr>
+                <td>{{ c.name }}</td>
+                <td>{{ c.qty }}</td>
+                <td>{{ c.unit_price }}</td>
+                <td><a class="btn btn-sm btn-outline-danger" href="/cart/remove/{{ loop.index0 }}">X</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <a class="btn btn-secondary w-100 mb-2" href="/cart/clear">{{ t('clear_cart') if t else 'Clear cart' }}</a>
+
+          <form method="post" action="/sale/preview">
+            <input class="form-control mb-2" name="customer_note" placeholder="{{ t('customer_note') if t else 'Customer note' }}" value="Retail">
+            <div class="row g-2 mb-2">
+              <div class="col-4"><input class="form-control" name="shipping_cost" type="number" step="0.01" min="0" placeholder="{{ t('shipping') if t else 'Shipping' }}"></div>
+              <div class="col-4"><input class="form-control" name="commission" type="number" step="0.01" min="0" placeholder="{{ t('commission') if t else 'Commission' }}"></div>
+              <div class="col-4"><input class="form-control" name="other_cost" type="number" step="0.01" min="0" placeholder="{{ t('other') if t else 'Other' }}"></div>
+            </div>
+            <input class="form-control mb-2" name="other_cost_note" placeholder="{{ t('other_cost_note') if t else 'Other cost note' }}">
+            <button class="btn btn-dark fw-bold w-100">{{ t('preview') if t else 'Preview' }}</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Edit Modal (custom) -->
+<div class="modal-backdrop-custom" id="modalBackdrop"></div>
+<div class="modal-custom" id="editModal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal-header">
+    <div class="fw-bold">{{ t('edit_product') if t else 'Edit product' }}</div>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCloseModal">X</button>
+  </div>
+
+  <form method="post" action="/product/update" id="editForm">
+    <div class="modal-body">
+      <input type="hidden" name="product_id" id="m_product_id">
+
+      <div class="row g-2">
+        <div class="col-md-4">
+          <label class="form-label mb-1">SKU</label>
+          <input class="form-control" name="sku" id="m_sku" placeholder="SKU">
+        </div>
+
+        <div class="col-md-8">
+          <label class="form-label mb-1">{{ t('name') if t else 'Name' }}</label>
+          <input class="form-control" name="name" id="m_name" required>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label mb-1">{{ t('cost') if t else 'Cost' }}</label>
+          <div class="input-group">
+            <input class="form-control" name="cost" id="m_cost" type="number" min="0" step="0.01">
+            <span class="input-group-text">đ</span>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label mb-1">{{ t('sell_price') if t else 'Sell price' }}</label>
+          <div class="input-group">
+            <input class="form-control" name="sell_price" id="m_sell_price" type="number" min="0" step="0.01">
+            <span class="input-group-text">đ</span>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label mb-1">{{ t('note') if t else 'Note' }}</label>
+          <input class="form-control" name="note" id="m_note">
+        </div>
+
+        <div class="col-md-6">
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" name="low_stock_enabled" value="1" id="m_low_stock_enabled">
+            <label class="form-check-label" for="m_low_stock_enabled">
+              {{ t('low_stock_alert') if t else 'Low stock alert' }}
+            </label>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label mb-1">{{ t('threshold') if t else 'Threshold' }}</label>
+          <div class="input-group">
+            <input class="form-control" name="low_stock_threshold" id="m_low_stock_threshold" type="number" min="0" step="0.01">
+            <span class="input-group-text">qty</span>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="email_enabled" value="1" id="m_email_enabled">
+            <label class="form-check-label" for="m_email_enabled">
+              {{ t('email_alert') if t else 'Email alert' }}
+            </label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline-secondary" id="btnCancelModal">
+        {{ t('cancel') if t else 'Cancel' }}
+      </button>
+      <button type="submit" class="btn btn-primary fw-bold">
+        {{ t('save') if t else 'Save' }}
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  // Product lookup for left forms autofill
+  const PRODUCTS = {
+    {% for p in products %}
+      "{{ p.id }}": {
+        id: {{ p.id }},
+        name: {{ (p.name or "")|tojson }},
+        on_hand: {{ (p.on_hand or 0)|tojson }},
+        cost: {{ (p.cost or 0)|tojson }},
+        sell_price: {{ (p.sell_price or 0)|tojson }},
+        sku: {{ (p.sku or "")|tojson }}
+      },
+    {% endfor %}
+  };
+
+  function parsePickValue(v) {
+    if (!v) return null;
+    const m = String(v).match(/^(\d+)\s*\|/);
+    if (m) return m[1];
+    if (/^\d+$/.test(v.trim())) return v.trim();
+    return null;
+  }
+
+  function wireProductPick(formId, hiddenIdId, onHandId, costId, sellPriceId) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+
+    const pick = form.querySelector('input[name="product_pick"]');
+    const hidden = document.getElementById(hiddenIdId);
+    const onHandEl = document.getElementById(onHandId);
+    const costEl = costId ? document.getElementById(costId) : null;
+    const sellEl = sellPriceId ? document.getElementById(sellPriceId) : null;
+
+    function apply(pid) {
+      if (!pid || !PRODUCTS[pid]) {
+        hidden.value = "";
+        if (onHandEl) onHandEl.textContent = "—";
+        return;
+      }
+      const p = PRODUCTS[pid];
+      hidden.value = p.id;
+      if (onHandEl) onHandEl.textContent = String(p.on_hand);
+      if (costEl) costEl.value = p.cost ?? 0;
+      if (sellEl) sellEl.value = p.sell_price ?? 0;
+    }
+
+    pick.addEventListener("input", () => apply(parsePickValue(pick.value)));
+    pick.addEventListener("change", () => apply(parsePickValue(pick.value)));
+
+    form.addEventListener("submit", (e) => {
+      const pid = parsePickValue(pick.value);
+      if (!pid || !PRODUCTS[pid]) {
+        e.preventDefault();
+        alert("Please select a product from the dropdown list.");
+        return;
+      }
+      hidden.value = pid;
+    });
+  }
+
+  wireProductPick("stockInForm", "stockIn_product_id", "stockIn_on_hand", "stockIn_unit_cost", null);
+  wireProductPick("stockOutForm", "stockOut_product_id", "stockOut_on_hand", null, "stockOut_unit_price");
+
+  // Table search
+  const searchInput = document.getElementById("productSearch");
+  const table = document.getElementById("productTable");
+  if (searchInput && table) {
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.trim().toLowerCase();
+      for (const row of table.querySelectorAll("tbody .product-row")) {
+        const hay = (row.dataset.search || "").toLowerCase();
+        row.style.display = (!q || hay.includes(q)) ? "" : "none";
+      }
+    });
+  }
+
+  // Clock
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function tick() {
+    const d = new Date();
+    const hh = pad2(d.getHours());
+    const mm = pad2(d.getMinutes());
+    const ss = pad2(d.getSeconds());
+    const dd = pad2(d.getDate());
+    const mo = pad2(d.getMonth() + 1);
+    const yy = d.getFullYear();
+    const clock = document.getElementById("clock");
+    const solar = document.getElementById("solarDate");
+    if (clock) clock.textContent = `${hh}:${mm}:${ss}`;
+    if (solar) solar.textContent = `${dd}/${mo}/${yy}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // Modal logic (custom)
+  const backdrop = document.getElementById("modalBackdrop");
+  const modal = document.getElementById("editModal");
+
+  function openModal() {
+    backdrop.style.display = "block";
+    modal.style.display = "block";
+    modal.setAttribute("aria-hidden", "false");
+  }
+  function closeModal() {
+    backdrop.style.display = "none";
+    modal.style.display = "none";
+    modal.setAttribute("aria-hidden", "true");
+  }
+
+  function fillModalFromRow(row) {
+    const raw = row.dataset.product;
+    if (!raw) return;
+    let p;
+    try { p = JSON.parse(raw); } catch(e) { return; }
+
+    document.getElementById("m_product_id").value = p.id;
+    document.getElementById("m_sku").value = p.sku || "";
+    document.getElementById("m_name").value = p.name || "";
+    document.getElementById("m_cost").value = p.cost ?? 0;
+    document.getElementById("m_sell_price").value = p.sell_price ?? 0;
+    document.getElementById("m_note").value = p.note || "";
+    document.getElementById("m_low_stock_enabled").checked = !!p.low_stock_enabled;
+    document.getElementById("m_low_stock_threshold").value = p.low_stock_threshold ?? 0;
+    document.getElementById("m_email_enabled").checked = !!p.email_enabled;
+  }
+
+  // bind row double click + edit buttons
+  if (table) {
+    table.querySelectorAll("tbody tr.product-row").forEach((row) => {
+      row.addEventListener("dblclick", () => {
+        fillModalFromRow(row);
+        openModal();
+      });
+      const btn = row.querySelector(".btn-edit");
+      if (btn) {
+        btn.addEventListener("click", () => {
+          fillModalFromRow(row);
+          openModal();
+        });
+      }
+    });
+  }
+
+  document.getElementById("btnCloseModal")?.addEventListener("click", closeModal);
+  document.getElementById("btnCancelModal")?.addEventListener("click", closeModal);
+  backdrop?.addEventListener("click", closeModal);
+
+  // ESC to close
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeModal();
+  });
+</script>
+
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h3 class="mb-0">Activity log</h3>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="/report/summary">Summary</a>
+    <a class="btn btn-outline-secondary" href="/report/mine">Mine</a>
+    <a class="btn btn-primary" href="/report/activity">Activity</a>
+  </div>
+</div>
+
+<form class="row g-2 mb-3" method="get" action="/report/activity">
+  <div class="col-auto">
+    <label class="form-label mb-1">Limit</label>
+    <input class="form-control" type="number" name="limit"
+           min="50" max="1000" step="50" value="{{ limit }}">
+  </div>
+  <div class="col-auto d-flex align-items-end">
+    <button class="btn btn-dark">Apply</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-header fw-bold">Recent activity</div>
+  <div class="card-body p-0">
+    <table class="table table-sm table-striped mb-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width:190px">Time</th>
+          <th style="width:140px">User</th>
+          <th style="width:220px">Action</th>
+          <th style="width:160px">Entity</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="text-muted">{{ r.created_at }}</td>
+            <td>{{ r.username or '-' }}</td>
+            <td><code>{{ r.action }}</code></td>
+            <td class="text-muted">
+              {{ r.entity_type }}{% if r.entity_id %} #{{ r.entity_id }}{% endif %}
+            </td>
+            <td class="text-muted" style="white-space:pre-wrap;">{{ r.detail }}</td>
+          </tr>
+        {% endfor %}
+
+        {% if not rows %}
+          <tr><td colspan="5" class="text-center text-muted p-3">No activity yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

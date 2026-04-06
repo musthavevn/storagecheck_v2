@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3">Preview Receipt</h4>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div><b>Customer note:</b> {{ customer_note }}</div>
+    <div><b>Shipping:</b> {{ shipping_cost }}</div>
+    <div><b>Commission:</b> {{ commission }}</div>
+    <div><b>Other cost:</b> {{ other_cost }} ({{ other_cost_note }})</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-bordered mb-0">
+      <thead class="table-light">
+        <tr><th>#</th><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+      </thead>
+      <tbody>
+        {% for c in cart %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ c.name }}</td>
+          <td>{{ c.qty }}</td>
+          <td>{{ c.unit_price }}</td>
+          <td>{{ c.qty * c.unit_price }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mt-3">
+  <div><b>Total sales:</b> {{ total_sales }}</div>
+  <div><b>Total cost:</b> {{ total_cost }}</div>
+  <div><b>Profit:</b> {{ profit }}</div>
+</div>
+
+<form method="post" action="/sale/checkout" class="mt-3">
+  <input type="hidden" name="customer_note" value="{{ customer_note }}">
+  <input type="hidden" name="shipping_cost" value="{{ shipping_cost }}">
+  <input type="hidden" name="commission" value="{{ commission }}">
+  <input type="hidden" name="other_cost" value="{{ other_cost }}">
+  <input type="hidden" name="other_cost_note" value="{{ other_cost_note }}">
+  <button class="btn btn-danger fw-bold w-100" onclick="return confirm('Confirm checkout?');">
+    CHECKOUT (Deduct stock)
+  </button>
+</form>
+
+<a class="btn btn-link mt-2" href="/">Back</a>
+{% endblock %}

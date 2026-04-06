@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3 class="mb-3">Settings</h3>
+
+<div class="row g-3">
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header fw-bold">Theme</div>
+      <div class="card-body">
+        <form method="post" action="/settings/save" class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Primary color</label>
+            <input type="color" class="form-control form-control-color"
+                   name="theme_primary"
+                   value="{{ s.theme_primary if s and s.theme_primary else '#0d6efd' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Section background</label>
+            <input type="color" class="form-control form-control-color"
+                   name="theme_section_bg"
+                   value="{{ s.theme_section_bg if s and s.theme_section_bg else '#f8f9fa' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Section border</label>
+            <input type="color" class="form-control form-control-color"
+                   name="theme_section_border"
+                   value="{{ s.theme_section_border if s and s.theme_section_border else '#e9ecef' }}">
+          </div>
+
+          <div class="col-12">
+            <button class="btn btn-primary fw-bold">Save theme</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header fw-bold">Top Banner</div>
+      <div class="card-body">
+        <div class="alert alert-info mb-3">
+          <div class="fw-bold">Recommended banner size</div>
+          <div>1200 × 180 px (ratio ~ 6:1). Homepage auto-fits to full width (fixed height 180px).</div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <form method="post" action="/settings/banner/upload" enctype="multipart/form-data">
+              <label class="form-label">Upload banner image</label>
+              <input class="form-control" type="file" name="banner_file" accept="image/*" required>
+              <div class="form-text">PNG/JPG/WEBP. This replaces the old banner automatically.</div>
+              <button class="btn btn-primary fw-bold mt-2">Upload</button>
+            </form>
+
+            <form method="post" action="/settings/banner/remove" class="mt-2"
+                  onsubmit="return confirm('Remove banner?');">
+              <button class="btn btn-outline-danger">Remove banner</button>
+            </form>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Current preview</label>
+            <div class="border rounded" style="height:180px; background:#f8f9fa; overflow:hidden;">
+              {% if s and s.banner_path %}
+                <img src="/instance/{{ s.banner_path }}" alt="banner"
+                     style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;">
+              {% elif s and s.banner_b64 and (s.banner_b64|length) > 10 %}
+                <img src="data:image/*;base64,{{ s.banner_b64 }}" alt="banner"
+                     style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;">
+              {% else %}
+                <div class="text-muted p-3">No banner set.</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
